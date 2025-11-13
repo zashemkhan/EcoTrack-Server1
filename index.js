@@ -143,6 +143,20 @@ async function run() {
       });
       res.send(result);
     });
+
+     // create post challenge api
+    app.post("/api/challenge/add", async (req, res) => {
+      const cursor = req.body;
+
+      const challengeWithOwner = {
+        ...cursor,
+        ownerEmail: req.query.email,
+      };
+      const result = await challengesCollection.insertOne(challengeWithOwner);
+
+      res.send(result);
+    });
+
     // users api
     app.post("/user", async (req, res) => {
       const body = req.body;
