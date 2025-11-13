@@ -144,7 +144,7 @@ async function run() {
       res.send(result);
     });
 
-     // create post challenge api
+    // create post challenge api
     app.post("/api/challenge/add", async (req, res) => {
       const cursor = req.body;
 
@@ -153,6 +153,34 @@ async function run() {
         ownerEmail: req.query.email,
       };
       const result = await challengesCollection.insertOne(challengeWithOwner);
+
+      res.send(result);
+    });
+
+    // update challenge api
+    app.patch("/api/challenge/update/:id", verifyToken, async (req, res) => {
+      const { id } = req.params;
+      const data = req.body;
+      const userEmail = req.user.email;
+
+      const challange = await challengesCollection.findOne({
+        _id: new ObjectId(id),
+      });
+
+      if (!challange) {
+        return res.status(404).send({ message: "challenge not found" });
+      }
+
+      if (challange.ownerEmail !== userEmail) {
+        return res
+          .status(403)
+          .send({ message: "unauthorized: you are not the owner" });
+      }
+
+      const result = await challengesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: data }
+      );
 
       res.send(result);
     });
