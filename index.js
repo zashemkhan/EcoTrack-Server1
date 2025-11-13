@@ -129,6 +129,20 @@ async function run() {
       await challengesCollection.updateOne(filter, update);
       res.send({ result });
     });
+    //challenges api
+    app.get("/api/challenges", async (req, res) => {
+      const result = await challengesCollection.find().toArray();
+      res.send(result);
+    });
+
+    // challenges details api
+    app.get("/api/challenges/:id", async (req, res) => {
+      const { id } = req.params;
+      const result = await challengesCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
     // users api
     app.post("/user", async (req, res) => {
       const body = req.body;
