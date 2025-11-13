@@ -70,13 +70,13 @@ async function run() {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
-  //challenges api
+    //challenges api
     app.get("/api/livestatics", async (req, res) => {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
 
-      // my activitis challange api
+    // my activitis challange api
     app.get("/api/challenges/join", async (req, res) => {
       const email = req.query.email;
       try {
@@ -104,7 +104,31 @@ async function run() {
       }
     });
 
-
+    // userChallenge join api
+    app.post("/api/challenges/join", verifyToken, async (req, res) => {
+      const data = req.body;
+      const alreadyJoined = await userChallengeCollection.findOne({
+        userId: req.use.email,
+        challengeId: data.challengeId,
+      });
+      if (alreadyJoined) {
+        return res
+          .status(400)
+          .send({ message: "You already joined this challenge" });
+      }
+      const joinedChallenge = {
+        ...data,
+        startDate: new Date(),
+        progress: 0,
+      };
+      const result = await userChallengeCollection.insertOne(joinedChallenge);
+      const filter = { _id: new ObjectId(data.challengeId) };
+      const update = {
+        $inc: { participants: 1 },
+      };
+      await challengesCollection.updateOne(filter, update);
+      res.send({ result });
+    });
     // users api
     app.post("/user", async (req, res) => {
       const body = req.body;
