@@ -13,7 +13,6 @@ admin.initializeApp({
 
 //server sider
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.garcytk.mongodb.net/?appName=Cluster0`;
-
 // midleware
 app.use(cors());
 app.use(express.json());
@@ -28,7 +27,6 @@ const verifyToken = async (req, res, next) => {
       .status(402)
       .send({ message: "unauthorized access. TOken not Found " });
   }
-
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     req.user = decodedToken;
@@ -56,7 +54,7 @@ app.get("/", (req, res) => {
 async function run() {
   try {
     await client.connect();
-    // database name and collection name
+    
     const db = client.db("ecotrackDB");
     const usersColllection = db.collection("users");
     const tipsCollection = db.collection("tips");
@@ -75,7 +73,6 @@ async function run() {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
-
     // my activitis challange api
     app.get("/api/challenges/join", async (req, res) => {
       const email = req.query.email;
