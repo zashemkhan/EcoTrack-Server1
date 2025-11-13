@@ -108,7 +108,7 @@ async function run() {
     app.post("/api/challenges/join", verifyToken, async (req, res) => {
       const data = req.body;
       const alreadyJoined = await userChallengeCollection.findOne({
-        userId: req.use.email,
+        userId: req.user.email,
         challengeId: data.challengeId,
       });
       if (alreadyJoined) {
@@ -123,10 +123,13 @@ async function run() {
       };
       const result = await userChallengeCollection.insertOne(joinedChallenge);
       const filter = { _id: new ObjectId(data.challengeId) };
+      console.log(filter);
       const update = {
         $inc: { participants: 1 },
       };
-      await challengesCollection.updateOne(filter, update);
+      const A = await challengesCollection.updateOne(filter, update);
+
+      console.log(A);
       res.send({ result });
     });
     //challenges api
