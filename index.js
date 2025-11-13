@@ -70,7 +70,47 @@ async function run() {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
+  //challenges api
+    app.get("/api/livestatics", async (req, res) => {
+      const result = await liveStaticsCollection.find().toArray();
+      res.send(result);
+    });
 
+      // my activitis challange api
+    app.get("/api/challenges/join", async (req, res) => {
+      const email = req.query.email;
+      try {
+        const joined = await userChallengeCollection
+          .find({ userId: email })
+          .toArray();
+        const challengeDetails = await Promise.all(
+          joined.map(async (item) => {
+            const challenge = await challengesCollection.findOne({
+              _id: new ObjectId(item.challengeId),
+            });
+            return {
+              ...item,
+              title: challenge?.title,
+              category: challenge?.category,
+              imageUrl: challenge?.imageUrl,
+              duration: challenge?.duration,
+              impactMetric: challenge?.impactMetric,
+            };
+          })
+        );
+        res.send(challengeDetails);
+      } catch (error) {
+        res.status(500).send({ message: "Failed to load user activities" });
+      }
+    });
+
+
+    // users api
+    app.post("/user", async (req, res) => {
+      const body = req.body;
+      const result = await usersColllection.insertOne(body);
+      res.send(result);
+    });
 
     // delete challenge api
     app.delete("/api/challenges/:id", verifyToken, async (req, res) => {
