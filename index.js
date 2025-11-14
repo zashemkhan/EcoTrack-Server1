@@ -13,6 +13,7 @@ admin.initializeApp({
 
 //server sider
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.garcytk.mongodb.net/?appName=Cluster0`;
+
 // midleware
 app.use(cors());
 app.use(express.json());
@@ -48,13 +49,12 @@ const client = new MongoClient(uri, {
 
 app.get("/", (req, res) => {
   res.send("ecotrack is working!");
-  next();
 });
 
 async function run() {
   try {
-    await client.connect();
-    
+    // await client.connect();
+
     const db = client.db("ecotrackDB");
     const usersColllection = db.collection("users");
     const tipsCollection = db.collection("tips");
@@ -68,11 +68,13 @@ async function run() {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
+
     //challenges api
     app.get("/api/livestatics", async (req, res) => {
       const result = await liveStaticsCollection.find().toArray();
       res.send(result);
     });
+
     // my activitis challange api
     app.get("/api/challenges/join", async (req, res) => {
       const email = req.query.email;
@@ -101,38 +103,60 @@ async function run() {
       }
     });
 
+    // users api
+    app.post("/user", async (req, res) => {
+      const body = req.body;
+      const result = await usersColllection.insertOne(body);
+      res.send(result);
+    });
+
     // userChallenge join api
     app.post("/api/challenges/join", verifyToken, async (req, res) => {
-      const data = req.body;
-      const alreadyJoined = await userChallengeCollection.findOne({
-        userId: req.user.email,
-        challengeId: data.challengeId,
-      });
-      if (alreadyJoined) {
-        return res
-          .status(400)
-          .send({ message: "You already joined this challenge" });
-      }
-      const joinedChallenge = {
-        ...data,
-        startDate: new Date(),
-        progress: 0,
-      };
-      const result = await userChallengeCollection.insertOne(joinedChallenge);
-      const filter = { _id: new ObjectId(data.challengeId) };
-      console.log(filter);
-      const update = {
-        $inc: { participants: 1 },
-      };
-      const A = await challengesCollection.updateOne(filter, update);
+      try {
+        const { challengeId } = req.body;
+        const userEmail = req.user.email;
+        if (!challengeId) {
+          return res.status(400).send({ message: "Challenge ID is required" });
+        }
+        const alreadyJoined = await userChallengeCollection.findOne({
+          userId: userEmail,
+          challengeId,
+        });
 
-      console.log(A);
-      res.send({ result });
-    });
-    //challenges api
-    app.get("/api/challenges", async (req, res) => {
-      const result = await challengesCollection.find().toArray();
-      res.send(result);
+        if (alreadyJoined) {
+          return res
+            .status(400)
+            .send({ message: "You already joined this challenge" });
+        }
+
+        const joinedChallenge = {
+          challengeId,
+          userId: userEmail,
+          status: "Not Started",
+          startDate: new Date(),
+          progress: 0,
+        };
+
+        const insertResult = await userChallengeCollection.insertOne(
+          joinedChallenge
+        );
+
+        const updateResult = await challengesCollection.updateOne(
+          { _id: new ObjectId(challengeId) },
+          { $inc: { participants: 1 } }
+        );
+
+        res.status(200).send({
+          message: "Successfully joined challenge",
+          joinedChallenge: insertResult,
+          updatedChallenge: updateResult,
+        });
+      } catch (error) {
+        console.log(error);
+        res
+          .status(500)
+          .send({ message: "Failed to join challenge", error: error.message });
+      }
     });
 
     // challenges details api
@@ -145,20 +169,59 @@ async function run() {
     });
 
     // create post challenge api
-    app.post("/api/challenge/add", async (req, res) => {
+    app.post("/api/challenge/add", verifyToken, async (req, res) => {
       const cursor = req.body;
 
       const challengeWithOwner = {
         ...cursor,
-        ownerEmail: req.query.email,
+        createdAt: new Date(),
+        createdBy: req.user.email,
+        participants: 0,
       };
       const result = await challengesCollection.insertOne(challengeWithOwner);
 
       res.send(result);
     });
 
+    // filter challenge ap
+    app.get("/api/challenges", async (req, res) => {
+      try {
+        const { categories, start, end, minParticipants, maxParticipants } =
+          req.query;
+
+        let filters = {};
+        if (categories) {
+          const catArray = categories.split(",");
+          filters.category = { $in: catArray };
+        }
+        if (start) {
+          filters.startDate = { ...filters.startDate, $gte: new Date(start) };
+        }
+        if (end) {
+          filters.endDate = { ...filters.endDate, $lte: new Date(end) };
+        }
+        if (minParticipants) {
+          filters.participants = {
+            ...filters.participants,
+            $gte: parseInt(minParticipants),
+          };
+        }
+        if (maxParticipants) {
+          filters.participants = {
+            ...filters.participants,
+            $lte: parseInt(maxParticipants),
+          };
+        }
+        const result = await challengesCollection.find(filters).toArray();
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // update challenge api
-    app.patch("/api/challenge/update/:id", verifyToken, async (req, res) => {
+    app.patch("/api/challenges/update/:id", verifyToken, async (req, res) => {
       const { id } = req.params;
       const data = req.body;
       const userEmail = req.user.email;
@@ -166,29 +229,18 @@ async function run() {
       const challange = await challengesCollection.findOne({
         _id: new ObjectId(id),
       });
-
       if (!challange) {
         return res.status(404).send({ message: "challenge not found" });
       }
-
-      if (challange.ownerEmail !== userEmail) {
+      if (challange.createdBy !== userEmail) {
         return res
           .status(403)
           .send({ message: "unauthorized: you are not the owner" });
       }
-
       const result = await challengesCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: data }
       );
-
-      res.send(result);
-    });
-
-    // users api
-    app.post("/user", async (req, res) => {
-      const body = req.body;
-      const result = await usersColllection.insertOne(body);
       res.send(result);
     });
 
@@ -200,25 +252,20 @@ async function run() {
         const challange = await challengesCollection.findOne({
           _id: new ObjectId(id),
         });
-
         if (!challange) {
           return res.status(404).send({ message: "challenge not found" });
         }
-
-        if (challange.ownerEmail !== userEmail) {
+        if (challange.createdBy !== userEmail) {
           return res
             .status(403)
             .send({ message: "unauthorized: you are not the owner" });
         }
-
         const result = await challengesCollection.deleteOne({
           _id: new ObjectId(id),
         });
-
         await userChallengeCollection.deleteMany({
           challengeId: id,
         });
-
         res.send({ deletedCount: result.deletedCount });
       } catch (error) {
         res.status(500).send({ message: "Failed to delete challenge" });
@@ -249,8 +296,7 @@ async function run() {
       const result = await eventsCollection.find().toArray();
       res.send(result);
     });
-
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
