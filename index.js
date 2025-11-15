@@ -21,7 +21,7 @@ app.use(express.json());
 const verifyToken = async (req, res, next) => {
   const authorization = req.headers.authorization;
 
-  const token = authorization.split(" ")[1];
+  const token = authorization?.split(" ")[1];
 
   if (!token) {
     return res
@@ -237,9 +237,15 @@ async function run() {
           .status(403)
           .send({ message: "unauthorized: you are not the owner" });
       }
+
       const result = await challengesCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: data }
+        {
+          $set: {
+            ...data,
+            updateAt: new Date(),
+          },
+        }
       );
       res.send(result);
     });
